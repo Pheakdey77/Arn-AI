@@ -27,7 +27,8 @@ jobs:
         run: |
           choco install -y innosetup
           choco install -y tesseract
-          choco install -y poppler
+          # Try poppler; fall back to poppler-tools if needed
+          choco install -y poppler || choco install -y poppler-tools
         shell: powershell
 
       - name: Build app with PyInstaller (onedir)
@@ -38,6 +39,11 @@ jobs:
             --add-data "logo.png;." ^
             app.py
         shell: cmd
+
+      - name: Show dist tree
+        run: |
+          Get-ChildItem -Recurse -File dist | Select-Object FullName, Length | Format-Table -AutoSize
+        shell: pwsh
 
       - name: Prepare vendor binaries (Tesseract & Poppler)
         run: |
@@ -83,8 +89,15 @@ jobs:
 
       - name: Create installer with Inno Setup
         run: |
-          & 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe' installer\aanai.iss
-        shell: powershell
+          $issc = 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe'
+          if (Test-Path $issc) {
+            & $issc installer\aanai.iss
+          } elseif (Get-Command iscc -ErrorAction SilentlyContinue) {
+            iscc installer\aanai.iss
+          } else {
+            Write-Error 'Inno Setup (ISCC.exe) not found in default path or PATH.'
+          }
+        shell: pwsh
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
