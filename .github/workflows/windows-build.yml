@@ -27,9 +27,9 @@ jobs:
         run: |
           choco install -y innosetup
           choco install -y tesseract
-          # Try poppler; fall back to poppler-tools if needed
+          rem Try poppler; fall back to poppler-tools if needed
           choco install -y poppler || choco install -y poppler-tools
-        shell: powershell
+        shell: cmd
 
       - name: Build app with PyInstaller (onedir)
         run: |
@@ -42,7 +42,11 @@ jobs:
 
       - name: Show dist tree
         run: |
-          Get-ChildItem -Recurse -File dist | Select-Object FullName, Length | Format-Table -AutoSize
+          if (Test-Path dist) {
+            Get-ChildItem -Recurse -File dist | Select-Object FullName, Length | Format-Table -AutoSize
+          } else {
+            Write-Host "dist/ not found (PyInstaller may have failed)."
+          }
         shell: pwsh
 
       - name: Prepare vendor binaries (Tesseract & Poppler)
