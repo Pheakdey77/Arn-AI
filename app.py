@@ -63,6 +63,12 @@ def main():
         except Exception:
             base_path = os.path.dirname(__file__)
         return os.path.join(base_path, relative_path)
+
+    def app_base_dir() -> str:
+        """Directory of the running app (dist folder when frozen)."""
+        if getattr(sys, 'frozen', False):
+            return os.path.dirname(sys.executable)
+        return os.path.dirname(__file__)
     def get_modern_font():
         # Modern clean fonts for minimal design
         candidates = [
@@ -234,18 +240,25 @@ def main():
         
         return "mixed"
     def find_tesseract_binary() -> str | None:
-        """Try bundled vendor path first, then common system paths."""
-        # 0) Prefer bundled Windows vendor path
-        try:
-            vendor_tess = resource_path(os.path.join("vendor", "tesseract", "tesseract.exe"))
-            if os.path.exists(vendor_tess):
-                # Ensure tessdata can be found when bundled
-                vendor_tess_dir = os.path.dirname(vendor_tess)
-                if os.path.isdir(os.path.join(vendor_tess_dir, "tessdata")):
-                    os.environ.setdefault("TESSDATA_PREFIX", vendor_tess_dir)
-                return vendor_tess
-        except Exception:
-            pass
+        """Try bundled vendor path first (resource_path and app dir), then common system paths."""
+        # 0) Prefer bundled vendor path via resource_path
+        for path_builder in (
+            lambda: resource_path(os.path.join("vendor", "tesseract", "tesseract.exe")),
+            lambda: os.path.join(app_base_dir(), "vendor", "tesseract", "tesseract.exe"),
+        ):
+            try:
+                p = path_builder()
+                if os.path.exists(p):
+                    vendor_dir = os.path.dirname(p)
+                    tessdata_dir = os.path.join(vendor_dir, "tessdata")
+                    if os.path.isdir(tessdata_dir):
+                        os.environ["TESSDATA_PREFIX"] = vendor_dir
+                    # Put vendor dir on PATH for any DLL side-loading on Windows
+                    if os.name == 'nt' and vendor_dir not in os.environ.get('PATH', ''):
+                        os.environ['PATH'] = vendor_dir + os.pathsep + os.environ.get('PATH', '')
+                    return p
+            except Exception:
+                pass
         # 1) Common system paths
         candidates = [
             "/opt/homebrew/bin/tesseract",   # macOS ARM Homebrew
@@ -259,20 +272,24 @@ def main():
         return None
 
     def ensure_lang_available(lang: str) -> tuple[bool, str]:
-        """Check that Tesseract is available; set binary path if needed."""
+        """Ensure Tesseract binary and tessdata are available (prefer bundled vendor path)."""
+        cmd = find_tesseract_binary()
+        if cmd:
+            pytesseract.pytesseract.tesseract_cmd = cmd
         try:
-            # If pytesseract cannot find binary, set a likely path
-            try:
-                _ = pytesseract.get_tesseract_version()
-            except Exception:
-                cmd = find_tesseract_binary()
-                if cmd:
-                    pytesseract.pytesseract.tesseract_cmd = cmd
-            _ = pytesseract.get_tesseract_version()
-            tess_lang = map_lang_to_tess(lang)
-            return True, f"Using Tesseract with lang '{tess_lang}'"
+            ver = pytesseract.get_tesseract_version()
         except Exception as e:
-            return False, f"Tesseract not available: {e}"
+            hint_paths = [
+                resource_path(os.path.join("vendor", "tesseract", "tesseract.exe")),
+                os.path.join(app_base_dir(), "vendor", "tesseract", "tesseract.exe"),
+            ]
+            return False, (
+                "Tesseract not available. Checked: "
+                + "; ".join(hint_paths)
+                + f". Error: {e}"
+            )
+        tess_lang = map_lang_to_tess(lang)
+        return True, f"Using Tesseract {ver} (lang '{tess_lang}') at '{pytesseract.pytesseract.tesseract_cmd}'"
     def guess_poppler_path():
         # 0) Prefer bundled Windows vendor path
         try:
