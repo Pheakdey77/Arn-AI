@@ -1,0 +1,78 @@
+name: Windows EXE and Installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pyinstaller
+
+      - name: Install build tools (Inno Setup, Tesseract, Poppler)
+        run: |
+          choco install -y innosetup
+          choco install -y tesseract
+          choco install -y poppler
+        shell: powershell
+
+      - name: Build app with PyInstaller (onedir)
+        run: |
+          pyinstaller --windowed --noconsole ^
+            --name "AanAI" ^
+            --icon assets\app.ico ^
+            --add-data "logo.png;." ^
+            app.py
+        shell: cmd
+
+      - name: Prepare vendor binaries (Tesseract & Poppler)
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dist = "dist/AanAI"
+          New-Item -ItemType Directory -Force -Path "$dist/vendor/tesseract" | Out-Null
+          New-Item -ItemType Directory -Force -Path "$dist/vendor/poppler/bin" | Out-Null
+          # Tesseract (exe and tessdata)
+          $tessRoot = "C:/Program Files/Tesseract-OCR"
+          Copy-Item "$tessRoot/tesseract.exe" "$dist/vendor/tesseract/" -Force
+          if (Test-Path "$tessRoot/tessdata") {
+            Copy-Item "$tessRoot/tessdata" "$dist/vendor/tesseract/" -Recurse -Force
+          }
+          # Poppler bins
+          $poppler = (Get-ChildItem -Directory "C:/ProgramData/chocolatey/lib/poppler*/tools" | Select-Object -First 1).FullName
+          if (-not $poppler) { $poppler = "C:/Program Files/poppler/bin" }
+          if (Test-Path $poppler) { Copy-Item "$poppler/*" "$dist/vendor/poppler/bin/" -Recurse -Force }
+        shell: powershell
+
+      - name: Create installer with Inno Setup
+        run: |
+          & 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe' installer\aanai.iss
+        shell: powershell
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AanAI-Installer
+          path: installer/dist/*.exe
+
+      - name: Upload portable build (zip)
+        run: |
+          Compress-Archive -Path dist/AanAI/* -DestinationPath dist/AanAI-portable.zip
+        shell: powershell
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AanAI-Portable
+          path: dist/AanAI-portable.zip
