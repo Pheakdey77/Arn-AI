@@ -3,7 +3,7 @@
 
 #define MyAppName "AanAI"
 #define MyAppVersion "1.0.0"
-#define MyAppPublisher "AanAI"
+#define MyAppPublisher "PHAL PHEAKDEY"
 #define MyAppURL "https://example.com"
 #define MyAppExeName "AanAI.exe"
 

@@ -62,7 +62,9 @@ jobs:
           if (-not (Test-Path "$tessRoot/tesseract.exe")) {
             Write-Error "Tesseract not found at $tessRoot"
           }
+          # Copy core exe and all dependent DLLs
           Copy-Item "$tessRoot/tesseract.exe" "$dist/vendor/tesseract/" -Force
+          Get-ChildItem "$tessRoot" -Filter *.dll | ForEach-Object { Copy-Item $_.FullName "$dist/vendor/tesseract/" -Force }
           if (Test-Path "$tessRoot/tessdata") {
             Copy-Item "$tessRoot/tessdata" "$dist/vendor/tesseract/" -Recurse -Force
           }
