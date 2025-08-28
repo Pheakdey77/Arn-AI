@@ -36,6 +36,7 @@ jobs:
           pyinstaller --windowed --noconsole ^
             --name "AanAI" ^
             --icon assets\app.ico ^
+            --add-data "assets\fonts;assets\fonts" ^
             --add-data "logo.png;." ^
             app.py
         shell: cmd
@@ -81,6 +82,27 @@ jobs:
             Copy-Item "$popplerTools/*" "$dist/vendor/poppler/bin/" -Recurse -Force
           } else {
             Write-Warning "Poppler tools not found; PDF conversion may fail"
+          }
+        shell: pwsh
+
+      - name: Ensure tessdata languages (eng, khm)
+        run: |
+          $tessdata = "dist/AanAI/vendor/tesseract/tessdata"
+          New-Item -ItemType Directory -Force -Path $tessdata | Out-Null
+          $langs = @("eng","khm")
+          foreach ($l in $langs) {
+            $dest = Join-Path $tessdata "$l.traineddata"
+            if (-not (Test-Path $dest)) {
+              Write-Host "Downloading $l.traineddata..."
+              $url = "https://github.com/tesseract-ocr/tessdata/raw/main/$l.traineddata"
+              try {
+                Invoke-WebRequest -Uri $url -OutFile $dest -UseBasicParsing
+              } catch {
+                Write-Warning "Failed to download $l from tessdata main; trying tessdata_best"
+                $url2 = "https://github.com/tesseract-ocr/tessdata_best/raw/main/$l.traineddata"
+                Invoke-WebRequest -Uri $url2 -OutFile $dest -UseBasicParsing
+              }
+            }
           }
         shell: pwsh
 

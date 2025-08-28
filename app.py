@@ -87,6 +87,24 @@ def main():
                 return name
         return tkfont.nametofont("TkDefaultFont").actual("family")
 
+    # Try to register bundled Noto Sans Khmer font on Windows so Tk can use it
+    def try_register_noto_sans_khmer():
+        try:
+            ttf_path = resource_path(os.path.join("assets", "fonts", "NotoSansKhmer-Regular.ttf"))
+            if os.path.exists(ttf_path) and os.name == 'nt':
+                import ctypes
+                FR_PRIVATE = 0x10
+                added = ctypes.windll.gdi32.AddFontResourceExW(ttf_path, FR_PRIVATE, 0)
+                # Notify running apps fonts changed
+                ctypes.windll.user32.SendMessageW(0xFFFF, 0x001D, 0, 0)
+                return added > 0
+        except Exception:
+            pass
+        return False
+
+    # Try to register Noto Sans Khmer (if bundled) before we query families
+    try_register_noto_sans_khmer()
+
     # Initialize PaddleOCR and stats tracking
     paddle_ocr = None
     processing_stats = {
@@ -644,7 +662,7 @@ def main():
         """Send text to Google Gemini to correct OCR mistakes (Khmer + English).
         Requires GEMINI_API_KEY in environment.
         """
-        api_key = os.environ.get("GEMINI_API_KEY")
+        api_key = "AIzaSyCsI699HjAERzJlZq6U2n_nfhK_CYO2hN8"
         if not api_key:
             raise RuntimeError("មិនឃើញ GEMINI_API_KEY នៅក្នុងបរិស្ថាន។ សូមកំណត់ GEMINI_API_KEY មុន។")
         try:
