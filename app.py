@@ -294,11 +294,85 @@ def main():
                 return c
         return None
 
+    def preferred_tessdata_dir(tess_cmd: str | None) -> str | None:
+        """Choose tessdata dir. Prefer bundled vendor; else next to the detected tesseract.exe."""
+        # Prefer bundled vendor path (resource_path then app dir)
+        for builder in (
+            lambda: resource_path(os.path.join("vendor", "tesseract", "tessdata")),
+            lambda: os.path.join(app_base_dir(), "vendor", "tesseract", "tessdata"),
+        ):
+            try:
+                p = builder()
+                parent = os.path.dirname(p)
+                if os.path.isdir(p) or os.path.isdir(parent):
+                    os.makedirs(p, exist_ok=True)
+                    return p
+            except Exception:
+                pass
+        # Fallback to sibling tessdata of the tesseract binary
+        if tess_cmd:
+            try:
+                cand = os.path.join(os.path.dirname(tess_cmd), "tessdata")
+                if os.path.isdir(os.path.dirname(cand)):
+                    os.makedirs(cand, exist_ok=True)
+                    return cand
+            except Exception:
+                pass
+        return None
+
+    def ensure_traineddata(lang_codes: list[str], tess_cmd: str | None) -> tuple[bool, str, str | None]:
+        """Ensure <lang>.traineddata files exist. Downloads missing ones.
+        Returns (ok, message, tessdata_dir).
+        """
+        td_dir = preferred_tessdata_dir(tess_cmd)
+        if not td_dir:
+            return False, "មិនអាចកំណត់ទីតាំង tessdata បានទេ", None
+        base = os.path.dirname(td_dir)
+        # Set TESSDATA_PREFIX to the directory containing 'tessdata'
+        try:
+            os.environ["TESSDATA_PREFIX"] = base
+        except Exception:
+            pass
+        missing = []
+        for l in lang_codes:
+            dest = os.path.join(td_dir, f"{l}.traineddata")
+            if os.path.exists(dest):
+                continue
+            missing.append((l, dest))
+        if not missing:
+            return True, f"tessdata រួចរាល់នៅ: {td_dir}", td_dir
+        # Download missing from official mirrors
+        for l, dest in missing:
+            ok = False
+            for url in (
+                f"https://github.com/tesseract-ocr/tessdata/raw/main/{l}.traineddata",
+                f"https://github.com/tesseract-ocr/tessdata_best/raw/main/{l}.traineddata",
+            ):
+                try:
+                    r = requests.get(url, timeout=60)
+                    if r.status_code == 200 and r.content:
+                        with open(dest, "wb") as f:
+                            f.write(r.content)
+                        ok = True
+                        break
+                except Exception:
+                    continue
+            if not ok:
+                return False, f"ខកខានទាញយក {l}.traineddata ទៅ {td_dir}", td_dir
+        return True, f"បានតម្លើង traineddata ទៅ: {td_dir}", td_dir
+
     def ensure_lang_available(lang: str) -> tuple[bool, str]:
         """Ensure Tesseract binary and tessdata are available (prefer bundled vendor path)."""
         cmd = find_tesseract_binary()
         if cmd:
             pytesseract.pytesseract.tesseract_cmd = cmd
+        # Determine required language files
+        tess_lang = map_lang_to_tess(lang)
+        required = [p.strip() for p in tess_lang.split('+') if p.strip()]
+        ok_td, msg_td, _td_dir = ensure_traineddata(required, cmd)
+        if not ok_td:
+            return False, msg_td
+        # Verify tesseract works
         try:
             ver = pytesseract.get_tesseract_version()
         except Exception as e:
@@ -311,7 +385,6 @@ def main():
                 + "; ".join(hint_paths)
                 + f". Error: {e}"
             )
-        tess_lang = map_lang_to_tess(lang)
         return True, f"Using Tesseract {ver} (lang '{tess_lang}') at '{pytesseract.pytesseract.tesseract_cmd}'"
     def guess_poppler_path():
         # 0) Prefer bundled Windows vendor path
