@@ -32,7 +32,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 ; Copy everything from the PyInstaller dist folder into the app directory
 Source: "..\dist\AanAI\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 ; Optionally include an .env.example
-Source: "..\..\.env.example"; DestDir: "{app}"; Flags: ignoreversion; Tasks: createenv
+Source: "..\.env.example"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist; Tasks: createenv
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
