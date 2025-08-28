@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Environment
+.env
+.env.*
+
+# OS
+.DS_Store
+
+# Build outputs
+build/
+dist/
+*.dmg
+
+# PyInstaller
+*.spec
+
+# Logs
+*.log
