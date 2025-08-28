@@ -105,3 +105,8 @@ python app.py
 - **UI Framework**: ttkbootstrap for modern, responsive interface
  - **AI Proofreading**: Implemented via OpenAI Python SDK. Reads `OPENAI_API_KEY` from environment and calls `gpt-4o-mini` with low temperature for conservative corrections.
 # Arn-AI
+
+## Author
+
+- Developer: PHAL PHEAKDEY
+

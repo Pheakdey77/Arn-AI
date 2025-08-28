@@ -55,6 +55,29 @@ def main():
     except Exception:
         pass
 
+    # Simple About dialog showing app info and developer
+    def show_about():
+        try:
+            message = (
+                "AanAI\n"
+                "Version: 1.0.0\n"
+                "Developer: PHAL PHEAKDEY\n\n"
+                "Khmer-English OCR with bundled Tesseract & Poppler."
+            )
+            messagebox.showinfo("About AanAI", message)
+        except Exception:
+            pass
+
+    # Add a menubar with Help > About
+    try:
+        menubar = tk.Menu(app)
+        helpmenu = tk.Menu(menubar, tearoff=0)
+        helpmenu.add_command(label="About", command=show_about)
+        menubar.add_cascade(label="Help", menu=helpmenu)
+        app.config(menu=menubar)
+    except Exception:
+        pass
+
     # --- Helpers ---
     def resource_path(relative_path: str) -> str:
         """Get absolute path to resource, works for dev and PyInstaller bundle."""
