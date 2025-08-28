@@ -45,17 +45,41 @@ jobs:
           $dist = "dist/AanAI"
           New-Item -ItemType Directory -Force -Path "$dist/vendor/tesseract" | Out-Null
           New-Item -ItemType Directory -Force -Path "$dist/vendor/poppler/bin" | Out-Null
+          
           # Tesseract (exe and tessdata)
           $tessRoot = "C:/Program Files/Tesseract-OCR"
+          if (-not (Test-Path "$tessRoot/tesseract.exe")) {
+            Write-Error "Tesseract not found at $tessRoot"
+          }
           Copy-Item "$tessRoot/tesseract.exe" "$dist/vendor/tesseract/" -Force
           if (Test-Path "$tessRoot/tessdata") {
             Copy-Item "$tessRoot/tessdata" "$dist/vendor/tesseract/" -Recurse -Force
           }
-          # Poppler bins
-          $poppler = (Get-ChildItem -Directory "C:/ProgramData/chocolatey/lib/poppler*/tools" | Select-Object -First 1).FullName
-          if (-not $poppler) { $poppler = "C:/Program Files/poppler/bin" }
-          if (Test-Path $poppler) { Copy-Item "$poppler/*" "$dist/vendor/poppler/bin/" -Recurse -Force }
-        shell: powershell
+          
+          # Poppler bins (Chocolatey installs under lib/poppler*/tools)
+          $popplerTools = $null
+          $popplerPkg = Get-ChildItem "C:/ProgramData/chocolatey/lib" -Filter "poppler*" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if ($popplerPkg) {
+            $candidate = Join-Path $popplerPkg.FullName "tools"
+            if (Test-Path $candidate) { $popplerTools = $candidate }
+          }
+          if (-not $popplerTools) {
+            $fallback = "C:/Program Files/poppler/bin"
+            if (Test-Path $fallback) { $popplerTools = $fallback }
+          }
+          if ($popplerTools) {
+            Copy-Item "$popplerTools/*" "$dist/vendor/poppler/bin/" -Recurse -Force
+          } else {
+            Write-Warning "Poppler tools not found; PDF conversion may fail"
+          }
+        shell: pwsh
+
+      - name: Verify build outputs
+        run: |
+          if (-not (Test-Path "dist/AanAI/AanAI.exe")) { Write-Error "PyInstaller output not found" }
+          if (-not (Test-Path "dist/AanAI/vendor/tesseract/tesseract.exe")) { Write-Error "Bundled Tesseract missing" }
+          if (-not (Test-Path "dist/AanAI/vendor/poppler/bin")) { Write-Warning "Bundled Poppler missing" }
+        shell: pwsh
 
       - name: Create installer with Inno Setup
         run: |
