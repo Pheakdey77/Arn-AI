@@ -36,6 +36,13 @@ def main():
     app.geometry("1280x900")
     app.minsize(900, 700)
     app.configure(bg='#ffffff')
+    # Set window icon from bundled logo.png (works cross-platform for Tk)
+    try:
+        icon_png = resource_path("logo.png")
+        if os.path.exists(icon_png):
+            app.iconphoto(True, tk.PhotoImage(file=icon_png))
+    except Exception:
+        pass
     # Center the window and bring it to front briefly (helps on macOS)
     try:
         app.place_window_center()
@@ -840,13 +847,13 @@ def main():
         pass
 
     # ចំណងជើងកម្មវិធី
-    title_font = tkfont.Font(family=get_modern_font(), size=24, weight="normal")
+    title_font = tkfont.Font(family=app_font_family, size=24, weight="normal")
     title = tb.Label(header_frame, text="អានអេអាយ", 
                     font=title_font, foreground='#1a1a1a')
     title.pack(anchor='w')
     
     # ចំណងជើងរង
-    subtitle_font = tkfont.Font(family=get_modern_font(), size=14, weight="normal")
+    subtitle_font = tkfont.Font(family=app_font_family, size=14, weight="normal")
     subtitle = tb.Label(header_frame, text="ស្រង់អត្ថបទពីរូបភាព និង PDF", 
                        font=subtitle_font, foreground='#6b7280')
     subtitle.pack(anchor='w', pady=(4, 0))
@@ -867,7 +874,7 @@ def main():
     upload_btn.pack()
     
     # ព័ត៌មានណែនាំ
-    hint_font = tkfont.Font(family=get_modern_font(), size=12)
+    hint_font = tkfont.Font(family=app_font_family, size=12)
     hint_label = tb.Label(upload_frame, text="ជ្រើសរើសឯកសារ PDF ឬ រូបភាព (PNG, JPG, JPEG, TIFF, BMP, WEBP)",
                          font=hint_font, foreground='#9ca3af')
     hint_label.pack(pady=(8, 0))
@@ -906,13 +913,13 @@ def main():
     file_info_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 8))
     
     file_info_title = tb.Label(file_info_frame, text="ព័ត៌មានឯកសារ", 
-                              font=tkfont.Font(family=get_modern_font(), size=12, weight='bold'),
+                              font=tkfont.Font(family=app_font_family, size=12, weight='bold'),
                               foreground='#374151')
     file_info_title.pack(anchor='w')
     
     file_size_var = tk.StringVar(value="មិនទាន់ជ្រើសឯកសារ")
     file_size_label = tb.Label(file_info_frame, textvariable=file_size_var,
-                              font=tkfont.Font(family=get_modern_font(), size=11),
+                              font=tkfont.Font(family=app_font_family, size=11),
                               foreground='#6b7280')
     file_size_label.pack(anchor='w', pady=(4, 0))
     
@@ -921,13 +928,13 @@ def main():
     progress_info_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(8, 8))
     
     progress_title = tb.Label(progress_info_frame, text="ការដំណើរការ", 
-                             font=tkfont.Font(family=get_modern_font(), size=12, weight='bold'),
+                             font=tkfont.Font(family=app_font_family, size=12, weight='bold'),
                              foreground='#374151')
     progress_title.pack(anchor='w')
     
     progress_var = tk.StringVar(value="រង់ចាំដំណើរការ")
     progress_label = tb.Label(progress_info_frame, textvariable=progress_var,
-                             font=tkfont.Font(family=get_modern_font(), size=11),
+                             font=tkfont.Font(family=app_font_family, size=11),
                              foreground='#6b7280')
     progress_label.pack(anchor='w', pady=(4, 0))
     
@@ -936,19 +943,19 @@ def main():
     stats_info_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(8, 0))
     
     stats_title = tb.Label(stats_info_frame, text="ស្ថិតិ", 
-                          font=tkfont.Font(family=get_modern_font(), size=12, weight='bold'),
+                          font=tkfont.Font(family=app_font_family, size=12, weight='bold'),
                           foreground='#374151')
     stats_title.pack(anchor='w')
     
     stats_var = tk.StringVar(value="បានស្រង់អក្សរ 0")
     stats_label = tb.Label(stats_info_frame, textvariable=stats_var,
-                          font=tkfont.Font(family=get_modern_font(), size=11),
+                          font=tkfont.Font(family=app_font_family, size=11),
                           foreground='#6b7280')
     stats_label.pack(anchor='w', pady=(4, 0))
     
     char_count_var = tk.StringVar(value="ចំនួនអក្សរ 0")
     char_count_label = tb.Label(stats_info_frame, textvariable=char_count_var,
-                          font=tkfont.Font(family=get_modern_font(), size=11),
+                          font=tkfont.Font(family=app_font_family, size=11),
                           foreground='#6b7280')
     char_count_label.pack(anchor='w', pady=(4, 0))
     
