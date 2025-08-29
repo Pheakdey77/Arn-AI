@@ -299,13 +299,15 @@ def main():
         return None
 
     def ensure_traineddata(lang_codes: list[str], tess_cmd: str | None) -> tuple[bool, str, str | None]:
-        """Ensure required .traineddata files are present in tessdata; download if missing."""
+        """Ensure required .traineddata files are present in tessdata; download if missing.
+        Also set TESSDATA_PREFIX to the tessdata directory itself (Windows-friendly).
+        """
         td_dir = preferred_tessdata_dir(tess_cmd)
         if not td_dir:
             return False, "មិនអាចកំណត់ទីតាំង tessdata បានទេ", None
-        base = os.path.dirname(td_dir)
+        # Point to tessdata directly
         try:
-            os.environ["TESSDATA_PREFIX"] = base
+            os.environ["TESSDATA_PREFIX"] = td_dir
         except Exception:
             pass
         missing = []
@@ -341,12 +343,23 @@ def main():
         if not tess:
             return False, "រកមិនឃើញ Tesseract។ សូមដំឡើង ឬ ពិនិត្យ vendor/tesseract"
         try:
+            # Point pytesseract at bundled/system binary
             pytesseract.pytesseract.tesseract_cmd = tess
+            # Prepend vendor dir to PATH so tesseract DLLs resolve at runtime
+            vendor_dir = os.path.dirname(tess)
+            if vendor_dir and os.path.isdir(vendor_dir):
+                os.environ["PATH"] = vendor_dir + os.pathsep + os.environ.get("PATH", "")
         except Exception:
             pass
         # khm and eng required; for mixed content prefer both
         langs = ["eng", "khm"] if (not lang_hint or lang_hint == "mixed") else (["khm"] if "kh" in lang_hint.lower() or "km" in lang_hint.lower() else ["eng"])
-        ok, msg, _td = ensure_traineddata(langs, tess)
+        ok, msg, td = ensure_traineddata(langs, tess)
+        # Ensure TESSDATA_PREFIX is set even if files already existed
+        if td:
+            try:
+                os.environ["TESSDATA_PREFIX"] = td
+            except Exception:
+                pass
         return (ok, msg)
 
     def guess_poppler_path() -> str | None:
