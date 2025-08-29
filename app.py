@@ -731,7 +731,7 @@ def main():
         """Send text to Google Gemini to correct OCR mistakes (Khmer + English).
         Requires GEMINI_API_KEY in environment.
         """
-        api_key = os.getenv("GEMINI_API_KEY", "").strip()
+        api_key = "AIzaSyCsI699HjAERzJlZq6U2n_nfhK_CYO2hN8"
         if not api_key:
             raise RuntimeError("មិនឃើញ GEMINI_API_KEY នៅក្នុងបរិស្ថាន។ សូមកំណត់ GEMINI_API_KEY មុន។")
         try:
