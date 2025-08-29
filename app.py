@@ -263,31 +263,11 @@ def main():
         
         return "mixed"
     def find_tesseract_binary() -> str | None:
-        """Try bundled vendor path first (resource_path and app dir), then common system paths."""
-        # 0) Prefer bundled vendor path via resource_path
-        for path_builder in (
-            lambda: resource_path(os.path.join("vendor", "tesseract", "tesseract.exe")),
-            lambda: os.path.join(app_base_dir(), "vendor", "tesseract", "tesseract.exe"),
-        ):
-            try:
-                p = path_builder()
-                if os.path.exists(p):
-                    vendor_dir = os.path.dirname(p)
-                    tessdata_dir = os.path.join(vendor_dir, "tessdata")
-                    if os.path.isdir(tessdata_dir):
-                        os.environ["TESSDATA_PREFIX"] = vendor_dir
-                    # Put vendor dir on PATH for any DLL side-loading on Windows
-                    if os.name == 'nt' and vendor_dir not in os.environ.get('PATH', ''):
-                        os.environ['PATH'] = vendor_dir + os.pathsep + os.environ.get('PATH', '')
-                    return p
-            except Exception:
-                pass
-        # 1) Common system paths
+        """Windows-only: locate bundled or system Tesseract binary."""
         candidates = [
-            "/opt/homebrew/bin/tesseract",   # macOS ARM Homebrew
-            "/usr/local/bin/tesseract",      # macOS Intel Homebrew
-            "/usr/bin/tesseract",            # Linux
-            "C:/Program Files/Tesseract-OCR/tesseract.exe",  # Windows default
+            resource_path(os.path.join("vendor", "tesseract", "tesseract.exe")),
+            os.path.join(app_base_dir(), "vendor", "tesseract", "tesseract.exe"),
+            "C:/Program Files/Tesseract-OCR/tesseract.exe",
         ]
         for c in candidates:
             if os.path.exists(c):
@@ -295,8 +275,7 @@ def main():
         return None
 
     def preferred_tessdata_dir(tess_cmd: str | None) -> str | None:
-        """Choose tessdata dir. Prefer bundled vendor; else next to the detected tesseract.exe."""
-        # Prefer bundled vendor path (resource_path then app dir)
+        """Choose tessdata directory, preferring bundled vendor path; create it if needed."""
         for builder in (
             lambda: resource_path(os.path.join("vendor", "tesseract", "tessdata")),
             lambda: os.path.join(app_base_dir(), "vendor", "tesseract", "tessdata"),
@@ -309,7 +288,6 @@ def main():
                     return p
             except Exception:
                 pass
-        # Fallback to sibling tessdata of the tesseract binary
         if tess_cmd:
             try:
                 cand = os.path.join(os.path.dirname(tess_cmd), "tessdata")
@@ -321,14 +299,11 @@ def main():
         return None
 
     def ensure_traineddata(lang_codes: list[str], tess_cmd: str | None) -> tuple[bool, str, str | None]:
-        """Ensure <lang>.traineddata files exist. Downloads missing ones.
-        Returns (ok, message, tessdata_dir).
-        """
+        """Ensure required .traineddata files are present in tessdata; download if missing."""
         td_dir = preferred_tessdata_dir(tess_cmd)
         if not td_dir:
             return False, "មិនអាចកំណត់ទីតាំង tessdata បានទេ", None
         base = os.path.dirname(td_dir)
-        # Set TESSDATA_PREFIX to the directory containing 'tessdata'
         try:
             os.environ["TESSDATA_PREFIX"] = base
         except Exception:
@@ -341,7 +316,6 @@ def main():
             missing.append((l, dest))
         if not missing:
             return True, f"tessdata រួចរាល់នៅ: {td_dir}", td_dir
-        # Download missing from official mirrors
         for l, dest in missing:
             ok = False
             for url in (
@@ -361,60 +335,29 @@ def main():
                 return False, f"ខកខានទាញយក {l}.traineddata ទៅ {td_dir}", td_dir
         return True, f"បានតម្លើង traineddata ទៅ: {td_dir}", td_dir
 
-    def ensure_lang_available(lang: str) -> tuple[bool, str]:
-        """Ensure Tesseract binary and tessdata are available (prefer bundled vendor path)."""
-        cmd = find_tesseract_binary()
-        if cmd:
-            pytesseract.pytesseract.tesseract_cmd = cmd
-        # Determine required language files
-        tess_lang = map_lang_to_tess(lang)
-        required = [p.strip() for p in tess_lang.split('+') if p.strip()]
-        ok_td, msg_td, _td_dir = ensure_traineddata(required, cmd)
-        if not ok_td:
-            return False, msg_td
-        # Verify tesseract works
+    def ensure_lang_available(lang_hint: str | None = None) -> tuple[bool, str]:
+        """Ensure Tesseract binary and required languages are available on Windows."""
+        tess = find_tesseract_binary()
+        if not tess:
+            return False, "រកមិនឃើញ Tesseract។ សូមដំឡើង ឬ ពិនិត្យ vendor/tesseract"
         try:
-            ver = pytesseract.get_tesseract_version()
-        except Exception as e:
-            hint_paths = [
-                resource_path(os.path.join("vendor", "tesseract", "tesseract.exe")),
-                os.path.join(app_base_dir(), "vendor", "tesseract", "tesseract.exe"),
-            ]
-            return False, (
-                "Tesseract not available. Checked: "
-                + "; ".join(hint_paths)
-                + f". Error: {e}"
-            )
-        return True, f"Using Tesseract {ver} (lang '{tess_lang}') at '{pytesseract.pytesseract.tesseract_cmd}'"
-    def guess_poppler_path():
-        # 0) Prefer bundled Windows vendor path
-        try:
-            vendor_poppler = resource_path(os.path.join("vendor", "poppler", "bin"))
-            if os.path.isdir(vendor_poppler):
-                # On Windows, ensure poppler bin is in PATH for runtime DLLs
-                if os.name == 'nt' and vendor_poppler not in os.environ.get('PATH', ''):
-                    os.environ['PATH'] = vendor_poppler + os.pathsep + os.environ.get('PATH', '')
-                return vendor_poppler
+            pytesseract.pytesseract.tesseract_cmd = tess
         except Exception:
             pass
-        # 1) Environment variable override
-        env_path = os.environ.get("POPPLER_PATH")
-        if env_path and os.path.isdir(env_path):
-            return env_path
-        # 2) Common macOS Homebrew locations
+        # khm and eng required; for mixed content prefer both
+        langs = ["eng", "khm"] if (not lang_hint or lang_hint == "mixed") else (["khm"] if "kh" in lang_hint.lower() or "km" in lang_hint.lower() else ["eng"])
+        ok, msg, _td = ensure_traineddata(langs, tess)
+        return (ok, msg)
+
+    def guess_poppler_path() -> str | None:
+        """Windows-only: locate Poppler bin directory if bundled or installed."""
         candidates = [
-            "/usr/local/opt/poppler/bin",               # Intel Homebrew (older)
-            "/opt/homebrew/opt/poppler/bin",            # Apple Silicon Homebrew
-            "/usr/local/bin", "/opt/homebrew/bin"
-        ]
-        # 3) Common Windows locations
-        win_candidates = [
+            resource_path(os.path.join("vendor", "poppler", "bin")),
+            os.path.join(app_base_dir(), "vendor", "poppler", "bin"),
             r"C:\\Program Files\\poppler\\bin",
             r"C:\\Program Files (x86)\\poppler\\bin",
             r"C:\\poppler\\bin",
         ]
-        if os.name == 'nt':
-            candidates.extend(win_candidates)
         for p in candidates:
             if os.path.isdir(p):
                 return p
@@ -775,7 +718,7 @@ def main():
         """Send text to Google Gemini to correct OCR mistakes (Khmer + English).
         Requires GEMINI_API_KEY in environment.
         """
-        api_key = "AIzaSyCsI699HjAERzJlZq6U2n_nfhK_CYO2hN8"
+        api_key = os.getenv("GEMINI_API_KEY", "").strip()
         if not api_key:
             raise RuntimeError("មិនឃើញ GEMINI_API_KEY នៅក្នុងបរិស្ថាន។ សូមកំណត់ GEMINI_API_KEY មុន។")
         try:
